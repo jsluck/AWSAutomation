@@ -2,4 +2,4 @@
 
 Training
 
-aclound.guru training course stuff.
+acloud.guru training course stuff.
