@@ -1,6 +1,8 @@
 import boto3
 import click
 from botocore.exceptions import ClientError
+from pathlib import Path
+import mimetypes
 
 s3 = boto3.resource('s3')
 client = boto3.client('s3')
@@ -60,7 +62,7 @@ def setup_bucket(bucket):
     pol = s3_bucket.Policy()
     pol.put(Policy=policy)
 
-    ws= s3_bucket.Website()
+    ws = s3_bucket.Website()
     ws.put(WebsiteConfiguration={
         'ErrorDocument': {
             'Key': 'error.html'
@@ -71,6 +73,27 @@ def setup_bucket(bucket):
     })
 
     return
+
+def upload_file(s3_bucket, path, key):
+    content_type = mimetypes.guess_type(key)[0] or 'text/plain'
+    s3_bucket.upload_file(path, key, ExtraArgs={'ContentType': 'text/html'})
+
+@cli.command('sync')
+@click.argument('pathname', type=click.Path(exists=True))
+@click.argument('bucket')
+def sync(pathname, bucket):
+    'Sync local files in PATHNAME with S3 in BUCKET'
+
+    s3_bucket = s3.Bucket(bucket)
+
+    root = Path(pathname).expanduser().resolve()
+
+    def handle_directory(target):
+        for p in target.iterdir():
+            if p.is_dir(): handle_directory(p)
+            if p.is_file(): upload_file(s3_bucket, str(p), str(p.relative_to(root)))
+
+    handle_directory(root)
 
 if __name__ == '__main__':
     cli()
