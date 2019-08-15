@@ -1,16 +1,28 @@
-import boto3
-import click
-from botocore.exceptions import ClientError
+#!/usr/bin/python3
+# -*- utf-8 -*-
+
+"""Deploy Website to AWS.
+
+Automates the creation and deployment of websites to AWS S3.
+"""
+
 from pathlib import Path
 import mimetypes
+import boto3
+from botocore.exceptions import ClientError
+import click
+
+import bucket
 
 s3 = boto3.resource('s3')
 client = boto3.client('s3')
 
+
 @click.group()
 def cli():
-    'Webotron deploys website to AWS'
+    '''Webotron deploys website to AWS'''
     pass
+
 
 @cli.command('list-buckets')
 def list_buckets():
@@ -18,26 +30,28 @@ def list_buckets():
     for bucket in s3.buckets.all():
         print(bucket)
 
+
 @cli.command('list-bucket-objects')
 @click.argument('bucket')
 def list_bucket_objects(bucket):
-    'Lists objects in a bucket'
+    '''Lists objects in a bucket'''
     for obj in s3.Bucket(bucket).objects.all():
         print(obj)
+
 
 @cli.command('setup-bucket')
 @click.argument('bucket')
 def setup_bucket(bucket):
-    'Create and configure a s3 bucket'
+    '''Create and configure a s3 bucket'''
     s3_bucket = None
 
-    try: 
-        s3_bucket = s3.create_bucket( 
-            Bucket=bucket, 
-            CreateBucketConfiguration={'LocationConstraint': client.meta.region_name} 
+    try:
+        s3_bucket = s3.create_bucket(
+            Bucket=bucket,
+            CreateBucketConfiguration={'LocationConstraint': client.meta.region_name}
         )
-    except ClientError as e: 
-        if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou': 
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
             s3_bucket = s3.Bucket(bucket)
             print('You already have a bucket with this name')
         else:
@@ -74,15 +88,18 @@ def setup_bucket(bucket):
 
     return
 
+
 def upload_file(s3_bucket, path, key):
+    '''Upload stuff to S3 BUCKET'''
     content_type = mimetypes.guess_type(key)[0] or 'text/plain'
-    s3_bucket.upload_file(path, key, ExtraArgs={'ContentType': 'text/html'})
+    s3_bucket.upload_file(path, key, ExtraArgs={'ContentType': content_type})
+
 
 @cli.command('sync')
 @click.argument('pathname', type=click.Path(exists=True))
 @click.argument('bucket')
 def sync(pathname, bucket):
-    'Sync local files in PATHNAME with S3 in BUCKET'
+    '''Sync local files in PATHNAME with S3 in BUCKET'''
 
     s3_bucket = s3.Bucket(bucket)
 
@@ -94,6 +111,7 @@ def sync(pathname, bucket):
             if p.is_file(): upload_file(s3_bucket, str(p), str(p.relative_to(root)))
 
     handle_directory(root)
+
 
 if __name__ == '__main__':
     cli()
